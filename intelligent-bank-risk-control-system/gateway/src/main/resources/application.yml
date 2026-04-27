@@ -1,0 +1,70 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: gateway
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: public
+        group: DEFAULT_GROUP
+
+    gateway:
+      # ????
+      routes:
+        # ??????
+        - id: backend-service
+          uri: lb://backend-service
+          predicates:
+            - Path=/api/core/**
+          filters:
+            - StripPrefix=1
+            - AddResponseHeader=X-Gateway-Service, backend
+
+        # AI ????
+        - id: ai-service
+          uri: lb://ai-service
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - StripPrefix=1
+            - AddResponseHeader=X-Gateway-Service, ai-service
+
+      # ??????
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: "*"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+            max-age: 3600
+
+      # ?????
+      default-filters:
+        - AddResponseHeader=X-Gateway-Timestamp, ${spring.application.name}
+
+      # ???????
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+# Actuator ????
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+# ????
+logging:
+  level:
+    com.system.gateway: debug
+    org.springframework.cloud.gateway: debug

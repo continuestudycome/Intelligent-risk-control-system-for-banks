@@ -7,6 +7,12 @@
     <groupId>com.risk-control-system</groupId>
     <artifactId>intelligent-bank-risk-control-system</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>gateway</module>
+        <module>backend</module>
+    </modules>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
