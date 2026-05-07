@@ -1,8 +1,8 @@
 package com.system.service;
 
-import com.bank.risk.dto.LoginDTO;
-import com.bank.risk.dto.RegisterDTO;
-import com.bank.risk.vo.TokenVO;
+import com.system.dto.LoginDTO;
+import com.system.dto.RegisterDTO;
+import com.system.vo.TokenVO;
 
 public interface AuthService {
 

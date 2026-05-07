@@ -18,7 +18,7 @@ spring:
     time-zone: GMT+8
 
   datasource:
-    url: jdbc:mysql://localhost:3306/trading?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/bank_risk_control?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -43,6 +43,11 @@ spring:
           max-idle: 10    # 最大空闲数（最多可以创建的连接数）
           min-idle: 1     # 最小空闲数（超过一段时间一直没人连接，连接池就会被释放，直到1）
           time-between-eviction-runs: 10s
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
 
 # 在原有配置基础上添加
 risk:
@@ -74,3 +79,34 @@ ai:
   service:
     url: http://localhost:8000
     name: ai-service
+
+# 信用评分（ai_services 逻辑回归 / 失败时本地兜底）
+credit:
+  ml:
+    timeout-ms: 8000
+  limit:
+    min-total: 10000
+    max-total: 2000000
+    # 调用 ai_services /credit/limit-recommend 的超时（毫秒），失败则 Java 本地规则兜底
+    timeout-ms: 8000
+    up-ratio: 0.02
+    down-ratio: 0.02
+    # 每日凌晨 2 点跑授信动态调整（下调自动、上调生成工单）
+    adjust-cron: "0 0 2 * * ?"
+
+# 实时反欺诈（规则引擎 + AI 孤立森林）
+# score-high：规则已为 LOW 时，仅当孤立森林异常分≥该值才升为 HIGH（避免正常交易被误抬档）
+# 智能客服 RAG（Java -> ai_services -> Ollama）
+bot:
+  rag:
+    timeout-ms: 180000
+
+fraud:
+  ml:
+    timeout-ms: 8000
+    score-high: 0.68
+  rule:
+    remote-amount-min: 28000
+    absolute-high-amount: 85000
+    probe-max-amount: 500
+    probe-count-medium: 4

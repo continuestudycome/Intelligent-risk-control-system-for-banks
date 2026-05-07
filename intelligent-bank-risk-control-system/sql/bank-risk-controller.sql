@@ -71,6 +71,32 @@ CREATE TABLE `sys_user_role` (
     INDEX `idx_role_id` (`role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表';
 
+
+-- ============================================================
+-- 初始化客户和风控人员角色及账号
+-- ============================================================
+
+-- 1. 插入两个角色
+INSERT INTO `sys_role` (`role_code`, `role_name`, `role_desc`, `status`) VALUES
+('CUSTOMER', '客户', '普通客户角色，可以查看个人信息、申请贷款等', 1),
+('RISK_MANAGER', '风控人员', '负责风控管理、审批、风险预警处理', 1);
+
+-- 2. 插入两个用户账号 (密码: 123456, BCrypt加密)
+-- 客户账号
+INSERT INTO `sys_user` (`username`, `password`, `real_name`, `phone`, `email`, `status`) VALUES
+('customer001', '$2b$10$gimzKrQ/9s15OREMjIAGkeF.Mbj6h1MmaX3DsHQsnmZmnxZIScET.', '张三', '13800138001', 'customer001@example.com', 1);
+
+-- 风控人员账号
+INSERT INTO `sys_user` (`username`, `password`, `real_name`, `phone`, `email`, `status`) VALUES
+('risk_manager001', '$2b$10$gimzKrQ/9s15OREMjIAGkeF.Mbj6h1MmaX3DsHQsnmZmnxZIScET.', '李四', '13800138002', 'risk_manager001@example.com', 1);
+
+-- 3. 关联用户角色
+-- 客户角色关联 (假设客户ID为1，角色ID为1)
+INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (1, 1);
+
+-- 风控人员角色关联 (假设风控人员ID为2，角色ID为2)
+INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (2, 2);
+
 -- 操作日志: 记录关键操作，满足审计要求
 CREATE TABLE `sys_operation_log` (
     `id`              BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT COMMENT '日志ID',
@@ -98,9 +124,9 @@ CREATE TABLE `sys_operation_log` (
 -- ============================================================
 -- 2. 客户信息管理模块 (cust_)
 -- ============================================================
-
 CREATE TABLE `cust_customer` (
     `id`              BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT COMMENT '客户ID',
+    `user_id`         BIGINT UNSIGNED     NOT NULL                COMMENT '关联sys_user.id',
     `customer_no`     VARCHAR(32)         NOT NULL                COMMENT '客户编号(唯一业务号)',
     `customer_type`   TINYINT UNSIGNED    NOT NULL                COMMENT '客户类型: 1-个人 2-企业',
     `real_name`       VARCHAR(128)        NOT NULL                COMMENT '真实姓名/企业全称',
@@ -112,6 +138,8 @@ CREATE TABLE `cust_customer` (
     `address`         VARCHAR(512)        DEFAULT NULL            COMMENT '详细地址',
     `annual_income`   DECIMAL(16,2)       DEFAULT NULL            COMMENT '年收入/年营业额(万元)',
     `asset_amount`    DECIMAL(16,2)       DEFAULT NULL            COMMENT '资产总额(万元)',
+    `credit_authorized` TINYINT UNSIGNED  DEFAULT 0               COMMENT '征信授权: 0-未授权 1-已授权',
+    `profile_completed` TINYINT UNSIGNED  DEFAULT 0               COMMENT '资料是否完善: 0-否 1-是',
     `credit_level`    CHAR(1)             DEFAULT NULL            COMMENT '信用等级: A/B/C/D',
     `is_blacklist`    TINYINT UNSIGNED    DEFAULT 0               COMMENT '是否黑名单: 0-否 1-是',
     `blacklist_reason` VARCHAR(512)       DEFAULT NULL            COMMENT '黑名单原因',
@@ -123,6 +151,7 @@ CREATE TABLE `cust_customer` (
     `update_time`     DATETIME            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted`      TINYINT UNSIGNED    DEFAULT 0               COMMENT '逻辑删除标志',
     PRIMARY KEY (`id`),
+    UNIQUE INDEX `uk_user_id` (`user_id`),
     UNIQUE INDEX `uk_customer_no` (`customer_no`),
     UNIQUE INDEX `uk_id_card_no` (`id_card_no`),
     INDEX `idx_customer_type` (`customer_type`, `status`, `is_deleted`),
@@ -201,6 +230,24 @@ CREATE TABLE `loan_approval_record` (
 -- ============================================================
 -- 4. 简单模拟交易模块 (txn_)
 -- ============================================================
+CREATE TABLE `acct_account` (
+    `id`                BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT COMMENT '账户ID',
+    `account_no`        VARCHAR(64)         NOT NULL                COMMENT '账户号',
+    `customer_id`       BIGINT UNSIGNED     NOT NULL                COMMENT '客户ID',
+    `account_name`      VARCHAR(64)         NOT NULL                COMMENT '账户名称',
+    `account_type`      TINYINT UNSIGNED    NOT NULL                COMMENT '账户类型: 1-借记卡 2-信用卡 3-对公账户',
+    `balance`           DECIMAL(16,2)       NOT NULL DEFAULT 0.00   COMMENT '可用余额',
+    `currency`          VARCHAR(8)          NOT NULL DEFAULT 'CNY'  COMMENT '币种',
+    `status`            TINYINT UNSIGNED    NOT NULL DEFAULT 1      COMMENT '状态: 0-禁用 1-可用',
+    `create_time`       DATETIME            DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       DATETIME            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted`        TINYINT UNSIGNED    DEFAULT 0               COMMENT '逻辑删除标志',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_account_no` (`account_no`),
+    KEY `idx_customer_id` (`customer_id`, `status`),
+    KEY `idx_status` (`status`, `is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户账户表';
+
 CREATE TABLE `txn_transaction` (
     `id`                  BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT COMMENT '交易ID',
     `transaction_no`      VARCHAR(32)         NOT NULL                COMMENT '交易流水号(唯一业务号)',
@@ -444,32 +491,101 @@ CREATE TABLE `bot_human_transfer` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='人工转接记录表';
 
 -- ============================================================
--- 8. 初始化数据
+-- 9. 登录角色与测试账号初始化（客户 + 风控人员）
+-- 默认密码：123456（BCrypt）
 -- ============================================================
 
-# -- 角色初始化
-# INSERT INTO `sys_role` (`role_code`, `role_name`, `role_desc`, `data_scope`, `status`) VALUES
-# ('ADMIN', '系统管理员', '拥有系统全部权限', 1, 1),
-# ('RISK_MANAGER', '风控经理', '负责审批、风控规则管理、风险预警处理', 2, 1),
-# ('OPERATOR', '业务操作员', '负责客户信息录入、交易查询、审批辅助', 3, 1);
+INSERT INTO `sys_role` (`role_code`, `role_name`, `role_desc`, `status`, `is_deleted`)
+VALUES
+    ('CUSTOMER', '客户', '系统客户角色', 1, 0),
+    ('RISK_OFFICER', '风控人员', '风控审批与监控角色', 1, 0)
+ON DUPLICATE KEY UPDATE
+    `role_name` = VALUES(`role_name`),
+    `role_desc` = VALUES(`role_desc`),
+    `status` = VALUES(`status`),
+    `is_deleted` = VALUES(`is_deleted`);
 
-# -- 管理员账号初始化 (密码: 123456, BCrypt加密)
-# INSERT INTO `sys_user` (`username`, `password`, `real_name`, `status`) VALUES
-# ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EO', '系统管理员', 1);
-#
-# -- 关联管理员角色
-# INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (1, 1);
-#
-# -- 模型版本初始化
-# INSERT INTO `crd_model_version` (`model_code`, `model_name`, `version`, `algorithm`, `is_active`, `metrics`) VALUES
-# ('CREDIT_SCORE', '信用评分模型V1', 'v1.0.0', 'XGBoost', 1, '{"AUC": 0.92, "F1": 0.88, "Accuracy": 0.90}'),
-# ('FRAUD_DETECT', '反欺诈检测模型V1', 'v1.0.0', 'IsolationForest', 1, '{"AUC": 0.89, "F1": 0.85, "Precision": 0.87, "Recall": 0.83}'),
-# ('OCR', '证件OCR识别模型V1', 'v1.0.0', 'ResNet+CRNN', 1, '{"Accuracy": 0.96, "Recall": 0.95}');
-#
-# -- 反欺诈规则初始化
-# INSERT INTO `frd_rule` (`rule_code`, `rule_name`, `rule_type`, `rule_condition`, `risk_level`, `priority`, `hit_threshold`, `status`, `version`) VALUES
-# ('RULE_AMOUNT_001', '单笔转账超5万', 1, 'transactionType == 1 && amount > 50000', 'MEDIUM', 10, 1, 1, 1),
-# ('RULE_FREQ_001', '5分钟内交易超5笔', 2, 'frequencyIn5Min > 5', 'HIGH', 20, 1, 1, 1),
-# ('RULE_LOC_001', '异地大额交易', 3, 'transactionCity != customerCity && amount > 10000', 'HIGH', 30, 1, 1, 1),
-# ('RULE_TIME_001', '凌晨异常交易', 4, 'hour >= 0 && hour <= 5 && amount > 1000', 'MEDIUM', 15, 1, 1, 1),
-# ('RULE_COMB_001', '新户大额转账', 5, 'accountAgeDays < 7 && transactionType == 1 && amount > 20000', 'HIGH', 40, 1, 1, 1);
+INSERT INTO `sys_user` (`username`, `password`, `real_name`, `phone`, `email`, `status`, `is_deleted`)
+VALUES
+    ('customer_demo', '$2b$10$gimzKrQ/9s15OREMjIAGkeF.Mbj6h1MmaX3DsHQsnmZmnxZIScET.', '客户示例账号', '13800000001', 'customer_demo@bank.com', 1, 0),
+    ('risk_demo', '$2b$10$gimzKrQ/9s15OREMjIAGkeF.Mbj6h1MmaX3DsHQsnmZmnxZIScET.', '风控示例账号', '13800000002', 'risk_demo@bank.com', 1, 0)
+ON DUPLICATE KEY UPDATE
+    `password` = VALUES(`password`),
+    `real_name` = VALUES(`real_name`),
+    `phone` = VALUES(`phone`),
+    `email` = VALUES(`email`),
+    `status` = VALUES(`status`),
+    `is_deleted` = VALUES(`is_deleted`);
+
+USE bank_risk_control;
+
+UPDATE sys_user
+SET password = '$2b$10$gimzKrQ/9s15OREMjIAGkeF.Mbj6h1MmaX3DsHQsnmZmnxZIScET.'
+WHERE username IN ('risk_demo', 'customer_demo', 'aaaa', 'bbbb');
+
+INSERT INTO `sys_user_role` (`user_id`, `role_id`)
+SELECT u.id, r.id
+FROM `sys_user` u
+JOIN `sys_role` r ON r.role_code = 'CUSTOMER'
+WHERE u.username = 'customer_demo'
+ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
+
+INSERT INTO `sys_user_role` (`user_id`, `role_id`)
+SELECT u.id, r.id
+FROM `sys_user` u
+JOIN `sys_role` r ON r.role_code = 'RISK_OFFICER'
+WHERE u.username = 'risk_demo'
+ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
+
+-- ============================================================
+-- 10. 客户信息模块增量字段（兼容已创建数据库）
+-- ============================================================
+ALTER TABLE `cust_customer`
+    ADD COLUMN IF NOT EXISTS `user_id` BIGINT UNSIGNED NOT NULL COMMENT '关联sys_user.id' AFTER `id`,
+    ADD COLUMN IF NOT EXISTS `credit_authorized` TINYINT UNSIGNED DEFAULT 0 COMMENT '征信授权: 0-未授权 1-已授权' AFTER `asset_amount`,
+    ADD COLUMN IF NOT EXISTS `profile_completed` TINYINT UNSIGNED DEFAULT 0 COMMENT '资料是否完善: 0-否 1-是' AFTER `credit_authorized`;
+
+ALTER TABLE `cust_customer`
+    ADD UNIQUE INDEX `uk_user_id` (`user_id`);
+
+-- ============================================================
+-- 11. 账户模块增量表（兼容已创建数据库）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `acct_account` (
+    `id`                BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT COMMENT '账户ID',
+    `account_no`        VARCHAR(64)         NOT NULL                COMMENT '账户号',
+    `customer_id`       BIGINT UNSIGNED     NOT NULL                COMMENT '客户ID',
+    `account_name`      VARCHAR(64)         NOT NULL                COMMENT '账户名称',
+    `account_type`      TINYINT UNSIGNED    NOT NULL                COMMENT '账户类型: 1-借记卡 2-信用卡 3-对公账户',
+    `balance`           DECIMAL(16,2)       NOT NULL DEFAULT 0.00   COMMENT '可用余额',
+    `currency`          VARCHAR(8)          NOT NULL DEFAULT 'CNY'  COMMENT '币种',
+    `status`            TINYINT UNSIGNED    NOT NULL DEFAULT 1      COMMENT '状态: 0-禁用 1-可用',
+    `create_time`       DATETIME            DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       DATETIME            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted`        TINYINT UNSIGNED    DEFAULT 0               COMMENT '逻辑删除标志',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_account_no` (`account_no`),
+    KEY `idx_customer_id` (`customer_id`, `status`),
+    KEY `idx_status` (`status`, `is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户账户表';
+
+-- 初始化演示账户（可重复执行）
+INSERT INTO `acct_account` (`account_no`, `customer_id`, `account_name`, `account_type`, `balance`, `currency`, `status`)
+SELECT '6222020000000003', c.id, 'customer_demo借记卡', 1, 200000.00, 'CNY', 1
+FROM `cust_customer` c
+JOIN `sys_user` u ON u.id = c.user_id
+WHERE u.username = 'aaaa'
+  AND c.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM `acct_account` a WHERE a.account_no = '6222020000000001'
+  );
+
+INSERT INTO `acct_account` (`account_no`, `customer_id`, `account_name`, `account_type`, `balance`, `currency`, `status`)
+SELECT '6222020000000004', c.id, 'merchant_demo收款账户', 3, 500000.00, 'CNY', 1
+FROM `cust_customer` c
+JOIN `sys_user` u ON u.id = c.user_id
+WHERE u.username = 'aaaa'
+  AND c.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM `acct_account` a WHERE a.account_no = '6222020000000002'
+  );

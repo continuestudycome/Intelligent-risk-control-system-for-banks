@@ -1,6 +1,6 @@
 package com.system.config;
 
-import com.bank.risk.security.JwtAuthenticationFilter;
+import com.system.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,8 +48,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 公开接口
                         .requestMatchers(
+                                "/auth/**",
                                 "/api/core/auth/**",
                                 "/api/core/public/**",
+                                "/ai-proxy/**",
                                 "/druid/**",
                                 "/actuator/**"
                         ).permitAll()

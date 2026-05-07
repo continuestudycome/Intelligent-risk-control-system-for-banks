@@ -1,5 +1,8 @@
 <template>
   <div class="login-container">
+    <div class="animated-bg">
+      <span v-for="i in 14" :key="i" class="dot" :style="dotStyle(i)"></span>
+    </div>
     <div class="login-box">
       <div class="login-header">
         <h1 class="title">银行智能风控系统</h1>
@@ -69,7 +72,7 @@
         </el-form-item>
 
         <div class="register-link">
-          还没有账号？<el-link type="primary" @click="$router.push('/register')">立即注册</el-link>
+          还没有账号？<el-link type="primary" @click="goRegister">立即注册</el-link>
         </div>
       </el-form>
     </div>
@@ -80,17 +83,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key, Loading } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api/auth'
+import type { CaptchaResponse, LoginRequest } from '@/api/types/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
-const loginFormRef = ref(null)
+const loginFormRef = ref<any>(null)
 const loading = ref(false)
 const captchaEnabled = ref(false)
 const captchaImage = ref('')
@@ -117,10 +121,29 @@ const loginRules = {
   ]
 }
 
+const dotStyle = (index: number) => {
+  const size = 8 + (index % 5) * 6
+  return {
+    width: `${size}px`,
+    height: `${size}px`,
+    left: `${(index * 7) % 95}%`,
+    animationDelay: `${index * 0.7}s`,
+    animationDuration: `${8 + (index % 6)}s`
+  }
+}
+
+const forceNavigate = (path: string) => {
+  window.location.assign(path)
+}
+
+const goRegister = () => {
+  forceNavigate('/register')
+}
+
 // 获取验证码
 const getCaptchaImage = async () => {
   try {
-    const res = await authApi.getCaptcha(captchaUuid.value)
+    const res: CaptchaResponse = await authApi.getCaptcha(captchaUuid.value)
     captchaImage.value = res.image
     captchaUuid.value = res.uuid
   } catch (error) {
@@ -130,6 +153,7 @@ const getCaptchaImage = async () => {
 
 // 登录
 const handleLogin = async () => {
+  if (!loginFormRef.value) return
   const valid = await loginFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -140,10 +164,11 @@ const handleLogin = async () => {
       password: loginForm.password,
       captcha: loginForm.captcha,
       rememberMe: loginForm.rememberMe
-    })
+    } as LoginRequest)
 
     ElMessage.success('登录成功')
-    router.push('/')
+    const target = userStore.isRiskOfficer ? '/risk/dashboard' : '/customer/dashboard'
+    forceNavigate(target)
   } catch (error) {
     // 登录失败，刷新验证码
     if (captchaEnabled.value) {
@@ -171,6 +196,36 @@ onMounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
+  overflow: hidden;
+}
+
+.animated-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dot {
+  position: absolute;
+  bottom: -40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  animation: floatUp linear infinite;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-110vh) scale(1.25);
+    opacity: 0;
+  }
 }
 
 .login-box {
@@ -179,6 +234,8 @@ onMounted(() => {
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 2;
 }
 
 .login-header {
@@ -253,6 +310,7 @@ onMounted(() => {
   bottom: 20px;
   color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
+  z-index: 2;
 }
 
 :deep(.el-input__wrapper) {

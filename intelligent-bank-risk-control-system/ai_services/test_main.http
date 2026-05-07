@@ -1,4 +1,4 @@
-# Test your FastAPI endpoints
+# 在 ai_services 目录: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 GET http://127.0.0.1:8000/
 Accept: application/json
@@ -7,5 +7,84 @@ Accept: application/json
 
 GET http://127.0.0.1:8000/hello/User
 Accept: application/json
+
+###
+
+POST http://127.0.0.1:8000/credit/limit-recommend
+Content-Type: application/json
+
+{
+  "risk_level": "A",
+  "blacklist": false,
+  "txn_count_90d": 50,
+  "asset_amount_wan": 600,
+  "min_total": 10000,
+  "max_total": 2000000
+}
+
+###
+
+POST http://127.0.0.1:8000/rule/fraud/validate
+Content-Type: application/json
+
+{
+  "rules": [
+    {
+      "ruleCode": "RULE_AMOUNT_EXTREME",
+      "ruleCondition": "{\"absoluteHighAmount\":85000}"
+    },
+    {
+      "ruleCode": "RULE_REMOTE_LARGE_TX",
+      "ruleCondition": "{\"remoteAmountMin\":28000}"
+    }
+  ]
+}
+
+###
+
+POST http://127.0.0.1:8000/chat/rag
+Content-Type: application/json
+
+{
+  "question": "交易被拦截怎么办",
+  "history": [],
+  "category_hint": "TRANSACTION",
+  "knowledge_items": [
+    {
+      "id": 1,
+      "category": "TRANSACTION",
+      "docType": "FAQ",
+      "question": "交易被拦截了怎么办？",
+      "answer": "请先核实收款方与金额…（示例）",
+      "keywords": "拦截",
+      "similarQuestions": ["钱转不出去"]
+    }
+  ]
+}
+
+###
+
+POST http://127.0.0.1:8000/rule/fraud/simulate
+Content-Type: application/json
+
+{
+  "thresholds": {
+    "absoluteHighAmount": 85000,
+    "remoteAmountMin": 28000,
+    "probeMaxAmount": 500,
+    "probeCountMedium": 4,
+    "mlScoreHigh": 0.68,
+    "rulesEnabled": {
+      "RULE_AMOUNT_EXTREME": true,
+      "RULE_REMOTE_LARGE_TX": true,
+      "RULE_FREQ_SMALL_PROBE": true,
+      "RULE_ML_ANOMALY_HIGH": true
+    }
+  },
+  "samples": [
+    {"amount": 90000, "sameProvince": true, "probeCount": 0, "mlScore": 0.2},
+    {"amount": 30000, "sameProvince": false, "probeCount": 0, "mlScore": 0.2}
+  ]
+}
 
 ###

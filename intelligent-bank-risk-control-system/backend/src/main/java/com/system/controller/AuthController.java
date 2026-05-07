@@ -1,10 +1,11 @@
 package com.system.controller;
 
-import com.bank.risk.common.Result;
-import com.bank.risk.dto.LoginDTO;
-import com.bank.risk.dto.RegisterDTO;
-import com.bank.risk.service.AuthService;
-import com.bank.risk.vo.TokenVO;
+import com.system.common.Result;
+import com.system.dto.LoginDTO;
+import com.system.dto.RefreshTokenDTO;
+import com.system.dto.RegisterDTO;
+import com.system.service.AuthService;
+import com.system.vo.TokenVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,12 +44,8 @@ public class AuthController {
      * 刷新令牌
      */
     @PostMapping("/refresh")
-    public Result<TokenVO> refreshToken(@RequestBody Map<String, String> params) {
-        String refreshToken = params.get("refreshToken");
-        if (refreshToken == null || refreshToken.isEmpty()) {
-            return Result.error(400, "刷新令牌不能为空");
-        }
-        return Result.success(authService.refreshToken(refreshToken));
+    public Result<TokenVO> refreshToken(@Valid @RequestBody RefreshTokenDTO refreshTokenDTO) {
+        return Result.success(authService.refreshToken(refreshTokenDTO.getRefreshToken()));
     }
 
     /**
@@ -66,7 +63,7 @@ public class AuthController {
      */
     @GetMapping("/captcha")
     public Result<Map<String, String>> getCaptcha(
-            @RequestParam(required = false) String uuid) {
+            @RequestParam(name = "uuid", required = false) String uuid) {
         String base64Image = authService.getCaptcha(uuid);
         String captchaUuid = uuid != null ? uuid : java.util.UUID.randomUUID().toString().replace("-", "");
 

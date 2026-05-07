@@ -6,7 +6,7 @@ import router from '@/router'
 
 // 创建axios实例
 const request: AxiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'
@@ -21,6 +21,9 @@ request.interceptors.request.use(
 
         if (token && config.headers) {
             config.headers['Authorization'] = `Bearer ${token}`
+        }
+        if (config.data instanceof FormData && config.headers) {
+            delete (config.headers as Record<string, unknown>)['Content-Type']
         }
 
         return config
@@ -68,13 +71,24 @@ request.interceptors.response.use(
                     ElMessage.error('请求的资源不存在')
                     break
                 case 500:
-                    ElMessage.error('服务器内部错误')
+                    ElMessage.error(
+                        (response.data as { message?: string })?.message || '服务器内部错误'
+                    )
                     break
                 default:
                     ElMessage.error((response.data as any)?.message || '网络错误')
             }
         } else {
-            ElMessage.error('网络连接失败')
+            const msg = error.message || ''
+            const isTimeout =
+                error.code === 'ECONNABORTED' || /timeout/i.test(msg)
+            if (isTimeout) {
+                ElMessage.error(
+                    '请求超时：智能客服需调用大模型，耗时较长；已放宽等待时间，若仍失败请检查后端与 Ollama 是否可用'
+                )
+            } else {
+                ElMessage.error('网络连接失败')
+            }
         }
 
         return Promise.reject(error)

@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class Result<T> {
-    /** 响应状态码：1-成功，0-失败 */
-    private String code;
+    /** 响应状态码：200-成功，其他-失败 */
+    private Integer code;
     
     /** 响应消息描述 */
     private String message;
@@ -26,7 +26,7 @@ public class Result<T> {
      * @param message 响应消息
      * @param data 响应数据
      */
-    public Result(String code, String message, T data) {
+    public Result(Integer code, String message, T data) {
         this.code = code;
         this.message = message;
         this.data = data;
@@ -39,7 +39,14 @@ public class Result<T> {
      * @param <T> 数据类型
      */
     public static <T> Result<T> success(T data) {
-        return new Result<>("1", "success", data);
+        return new Result<>(200, "success", data);
+    }
+
+    /**
+     * 成功响应（自定义提示文案，便于前端展示业务说明）
+     */
+    public static <T> Result<T> success(T data, String message) {
+        return new Result<>(200, message != null ? message : "success", data);
     }
 
     /**
@@ -48,7 +55,7 @@ public class Result<T> {
      * @param <T> 数据类型
      */
     public static <T> Result<T> success() {
-        return new Result<>("1", "success", null);
+        return new Result<>(200, "success", null);
     }
 
     /**
@@ -58,6 +65,10 @@ public class Result<T> {
      * @param <T> 数据类型
      */
     public static <T> Result<T> failure(String message) {
-        return new Result<>("0", message, null);
+        return new Result<>(500, message, null);
+    }
+
+    public static <T> Result<T> error(Integer code, String message) {
+        return new Result<>(code, message, null);
     }
 }

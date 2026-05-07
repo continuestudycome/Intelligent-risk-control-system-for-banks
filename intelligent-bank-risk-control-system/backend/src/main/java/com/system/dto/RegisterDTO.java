@@ -1,8 +1,11 @@
 package com.system.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 @Data
@@ -27,11 +30,11 @@ public class RegisterDTO {
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
 
+    @Pattern(regexp = "^$|^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$", message = "邮箱格式不正确")
     private String email;
 
-    @NotBlank(message = "身份证号不能为空")
-    @Pattern(regexp = "^\\d{17}[\\dXx]$", message = "身份证号格式不正确")
-    private String idCard;
-
+    @NotNull(message = "用户类型不能为空")
+    @Min(value = 1, message = "用户类型不合法")
+    @Max(value = 1, message = "公开注册仅支持客户账号")
     private Integer userType = 1;
 }

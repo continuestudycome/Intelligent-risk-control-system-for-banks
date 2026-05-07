@@ -11,29 +11,31 @@ spring:
         server-addr: localhost:8848
         namespace: public
         group: DEFAULT_GROUP
+      config:
+        import-check:
+          enabled: false
 
     gateway:
-      # ????
       routes:
-        # ??????
-        - id: backend-service
-          uri: lb://backend-service
-          predicates:
-            - Path=/api/core/**
-          filters:
-            - StripPrefix=1
-            - AddResponseHeader=X-Gateway-Service, backend
-
-        # AI ????
+        # /api/ai/** 必须排在 /api/** 之前，否则会走错后端
         - id: ai-service
           uri: lb://ai-service
+          order: 0
           predicates:
             - Path=/api/ai/**
           filters:
-            - StripPrefix=1
+            - StripPrefix=2
             - AddResponseHeader=X-Gateway-Service, ai-service
 
-      # ??????
+        - id: backend-service
+          uri: lb://backend-service
+          order: 10
+          predicates:
+            - Path=/api/**
+          filters:
+            - StripPrefix=1
+            - AddResponseHeader=X-Gateway-Service, backend-service
+
       globalcors:
         cors-configurations:
           '[/**]':
@@ -43,17 +45,14 @@ spring:
             allow-credentials: true
             max-age: 3600
 
-      # ?????
       default-filters:
         - AddResponseHeader=X-Gateway-Timestamp, ${spring.application.name}
 
-      # ???????
       discovery:
         locator:
           enabled: true
           lower-case-service-id: true
 
-# Actuator ????
 management:
   endpoints:
     web:
@@ -63,7 +62,6 @@ management:
     health:
       show-details: always
 
-# ????
 logging:
   level:
     com.system.gateway: debug

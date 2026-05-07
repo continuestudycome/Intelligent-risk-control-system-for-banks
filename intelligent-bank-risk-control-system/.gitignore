@@ -31,6 +31,10 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### Python 智能服务 ###
+ai_services/.venv/
+ai_services/data/
+
 ### VS Code ###
 .vscode/
 

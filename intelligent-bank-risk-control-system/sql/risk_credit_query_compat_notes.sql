@@ -1,0 +1,13 @@
+-- ============================================================
+-- 风控「信用评分查询」列表接口依赖说明（排查 500 / 数据库错误）
+-- ============================================================
+-- 1) 表 cust_customer 必须存在；至少包含：id, real_name, phone, customer_no, is_deleted。
+--    列表接口已不再 SELECT credit_level，故旧库缺少 credit_level 列不影响列表。
+--
+-- 2) 权限依赖 sys_user、sys_role、sys_user_role：登录账号需绑定 RISK_MANAGER 或 RISK_OFFICER。
+--    种子脚本见 bank-risk-controller.sql 中 sys_role / sys_user_role。
+--
+-- 3) 查看详情接口读取 crd_score：若尚未评分，返回 evaluated=false，不应报错。
+--    若表 crd_score 不存在，需在库中执行建表语句（同 bank-risk-controller.sql）。
+--
+-- 4) 建议重建库：DROP DATABASE bank_risk_control; 后完整执行 bank-risk-controller.sql。

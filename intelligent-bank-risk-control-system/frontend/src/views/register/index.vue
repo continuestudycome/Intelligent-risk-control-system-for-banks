@@ -81,20 +81,13 @@
           />
         </el-form-item>
 
-        <el-form-item label="身份证号" prop="idCard">
-          <el-input
-              v-model="registerForm.idCard"
-              placeholder="请输入18位身份证号"
-              :prefix-icon="Postcard"
-              size="large"
+        <el-form-item>
+          <el-alert
+            title="自助注册仅支持客户账号，风控人员账号由管理员后台开通。"
+            type="info"
+            :closable="false"
+            show-icon
           />
-        </el-form-item>
-
-        <el-form-item label="用户类型" prop="userType">
-          <el-radio-group v-model="registerForm.userType">
-            <el-radio :label="1">个人用户</el-radio>
-            <el-radio :label="2">企业用户</el-radio>
-          </el-radio-group>
         </el-form-item>
 
         <el-form-item>
@@ -110,38 +103,38 @@
         </el-form-item>
 
         <div class="login-link">
-          已有账号？<el-link type="primary" @click="$router.push('/login')">立即登录</el-link>
+          已有账号？<el-link type="primary" @click="goLogin">立即登录</el-link>
         </div>
       </el-form>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, UserFilled, Lock, Phone, Message, Postcard } from '@element-plus/icons-vue'
+import { User, UserFilled, Lock, Phone, Message } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import type { FormInstance, FormItemRule } from 'element-plus'
+import type { RegisterRequest } from '@/api/types/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
-const registerFormRef = ref(null)
+const registerFormRef = ref<FormInstance>()
 const loading = ref(false)
 
-const registerForm = reactive({
+const registerForm = reactive<RegisterRequest>({
   username: '',
   password: '',
   confirmPassword: '',
   realName: '',
   phone: '',
-  email: '',
-  idCard: '',
-  userType: 1
+  email: ''
 })
 
 // 自定义验证：确认密码
-const validateConfirmPassword = (rule, value, callback) => {
+const validateConfirmPassword: FormItemRule['validator'] = (_rule, value, callback) => {
   if (value !== registerForm.password) {
     callback(new Error('两次输入的密码不一致'))
   } else {
@@ -149,7 +142,7 @@ const validateConfirmPassword = (rule, value, callback) => {
   }
 }
 
-const registerRules = {
+const registerRules: Record<string, FormItemRule[]> = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { pattern: /^[a-zA-Z0-9_]{4,20}$/, message: '用户名只能包含4-20位字母、数字和下划线', trigger: 'blur' }
@@ -171,14 +164,19 @@ const registerRules = {
   ],
   email: [
     { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
-  ],
-  idCard: [
-    { required: true, message: '请输入身份证号', trigger: 'blur' },
-    { pattern: /^\d{17}[\dXx]$/, message: '身份证号格式不正确', trigger: 'blur' }
   ]
 }
 
+const forceNavigate = (path: string) => {
+  window.location.assign(path)
+}
+
+const goLogin = () => {
+  forceNavigate('/login')
+}
+
 const handleRegister = async () => {
+  if (!registerFormRef.value) return
   const valid = await registerFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -186,7 +184,7 @@ const handleRegister = async () => {
   try {
     await userStore.register(registerForm)
     ElMessage.success('注册成功，请登录')
-    router.push('/login')
+    forceNavigate('/login')
   } catch (error) {
     // 错误已在拦截器处理
   } finally {
